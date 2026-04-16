@@ -1,0 +1,72 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+
+
+model Account {
+  id        String   @id @default(uuid())
+  userId    String
+  currency  String    @default("USD")
+   balance   Decimal  @default(0) @db.Decimal(20, 2)
+  createdAt DateTime @default(now())
+
+   ledgers   LedgerEntry[]
+}
+
+model Transaction {
+  id            String        @id @default(uuid())
+  amount        Decimal       @db.Decimal(20, 2)
+  currency      String
+  status        String        // "PENDING", "COMPLETED", "FAILED"
+  idempotencyKey String       @unique
+  createdAt     DateTime      @default(now())
+  ledgerEntries LedgerEntry[]
+}
+
+model LedgerEntry {
+  id            String      @id @default(uuid())
+  accountId     String
+  transactionId String
+  type          String      // "DEBIT" or "CREDIT"
+  amount        Decimal     @db.Decimal(20, 2)
+  account       Account     @relation(fields: [accountId], references: [id])
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+}
+
+
+model IdempotencyRecord {
+  id             String   @id @default(uuid())
+  key            String   @unique
+  requestPayload Json     // To detect Scenario E (Payload mismatch)
+  responseBody   Json?    // Cached response
+  status         String   // "PROCESSING" or "COMPLETED"
+  createdAt      DateTime @default(now())
+  expiresAt      DateTime
+}
+
+model FxQuote {
+  id            String    @id @default(uuid())
+  fromCurrency  String
+  toCurrency    String
+  rate          Decimal   @db.Decimal(20, 6) // Rates require high precision
+  expiresAt     DateTime
+  usedAt        DateTime? // To ensure a quote is only used once
+  createdAt     DateTime  @default(now())
+}
+
+
+enum EntryType {
+  DEBIT
+  CREDIT
+}
