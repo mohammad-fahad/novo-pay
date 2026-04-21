@@ -1,33 +1,28 @@
 {
-  "name": "backend-assessment",
+  "name": "novapay",
+  "private": true,
   "version": "1.0.0",
-  "type": "module",
-  "main": "dist/server.js",
   "scripts": {
-    "start": "tsx dist/server.js",
-    "dev": "tsx watch src/server.ts",
-    "build": "tsc",
-    "worker:payroll": "tsx watch src/workers/payrollWorker.ts"
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "dev:api": "pnpm --filter @novapay/api dev",
+    "dev:web": "pnpm --filter @novapay/web dev",
+    "build:api": "pnpm --filter @novapay/api build",
+    "build:web": "pnpm --filter @novapay/web build",
+    "lint:api": "pnpm --filter @novapay/api lint",
+    "lint:web": "pnpm --filter @novapay/web lint"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
-  "dependencies": {
-    "@prisma/client": "^6.19.3",
-    "bullmq": "^5.75.2",
-    "decimal.js": "^10.6.0",
-    "dotenv": "^17.4.2",
-    "express": "^5.2.1",
-    "ioredis": "^5.10.1",
-    "prisma": "^6.19.3",
-    "tsx": "^4.21.0"
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "esbuild",
+      "msgpackr-extract",
+      "prisma",
+      "sharp",
+      "unrs-resolver"
+    ]
   },
-  "devDependencies": {
-    "@types/express": "^5.0.6",
-    "@types/node": "^25.6.0",
-    "ts-node": "^10.9.2",
-    "ts-node-dev": "^2.0.0",
-    "typescript": "^6.0.3"
-  }
+  "packageManager": "pnpm@10.0.0"
 }

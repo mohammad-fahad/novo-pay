@@ -1,3 +1,58 @@
+# NovaPay Monorepo
+
+NovaPay is a high-integrity fintech system built with:
+
+- `apps/api`: Node.js + TypeScript + Express + Prisma + BullMQ (Redis)
+- `apps/web`: Next.js (App Router) dashboard UI
+
+## Monorepo layout
+
+```text
+apps/
+  api/
+  web/
+```
+
+## Running locally
+
+### Prerequisites
+
+- Node.js 20+
+- pnpm
+
+### Install
+
+```bash
+pnpm install
+```
+
+### Dev (API + Web)
+
+```bash
+pnpm dev
+```
+
+### Ports
+
+- API: `http://localhost:3000`
+- Web: `http://localhost:3001`
+
+### Dev (single app)
+
+```bash
+pnpm dev:api
+pnpm dev:web
+```
+
+## Environment
+
+- API env: `apps/api/.env` (copy from `apps/api/.env.example`)
+- Web env: `apps/web/.env.local` (set `NOVAPAY_API_BASE`)
+
+## Docs
+
+- Backend documentation: `apps/api/README.md`
+- Frontend documentation: `apps/web/README.md`
 # NovaPay - High-Integrity Financial Backend
 
 NovaPay is a TypeScript-first backend for financial transfers and bulk payroll execution.  

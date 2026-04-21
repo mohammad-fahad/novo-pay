@@ -13,6 +13,20 @@ export interface PayrollJobResult {
   failed: number;
 }
 
+export interface PayrollJobProgress {
+  total: number;
+  processed: number;
+  failed: number;
+}
+
+export interface PayrollJobStatusResponse {
+  jobId: string;
+  state: string;
+  progress: PayrollJobProgress | null;
+  result: PayrollJobResult | null;
+  failedReason?: string;
+}
+
 const PAYROLL_QUEUE = "payroll-queue";
 
 let payrollQueue: Queue<PayrollJobData, PayrollJobResult> | undefined;
@@ -44,4 +58,23 @@ export async function enqueuePayroll(transfers: PayrollTransfer[]): Promise<stri
   );
 
   return job.id?.toString() ?? "unknown";
+}
+
+export async function getPayrollJobStatus(jobId: string): Promise<PayrollJobStatusResponse> {
+  const job = await getPayrollQueue().getJob(jobId);
+  if (!job) {
+    throw new AppError("PAYROLL_JOB_NOT_FOUND", 404);
+  }
+
+  const state = await job.getState();
+  const progress = job.progress ?? null;
+  const result = (job.returnvalue ?? null) as PayrollJobResult | null;
+
+  return {
+    jobId: String(job.id),
+    state,
+    progress: (typeof progress === "object" && progress !== null ? (progress as PayrollJobProgress) : null),
+    result,
+    failedReason: job.failedReason || undefined,
+  };
 }

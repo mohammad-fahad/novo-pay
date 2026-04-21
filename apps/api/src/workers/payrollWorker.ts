@@ -12,6 +12,9 @@ const payrollWorker = new Worker<PayrollJobData, PayrollJobResult>(
   async (job: Job<PayrollJobData, PayrollJobResult>): Promise<PayrollJobResult> => {
     const { transfers } = job.data;
     let failed = 0;
+    const total = transfers.length;
+
+    await job.updateProgress({ total, processed: 0, failed });
 
     for (let i = 0; i < transfers.length; i += 1) {
       const transfer = transfers[i];
@@ -36,6 +39,8 @@ const payrollWorker = new Worker<PayrollJobData, PayrollJobResult>(
           message: transferError.message,
         });
       }
+
+      await job.updateProgress({ total, processed: i + 1, failed });
     }
 
     return { success: true, processed: transfers.length, failed };
