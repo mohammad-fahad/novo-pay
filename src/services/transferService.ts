@@ -4,9 +4,9 @@ import {
   Prisma,
   type Transaction,
 } from "@prisma/client";
-import { prisma } from "../config/database.js";
-import { AppError } from "../middlewares/errorHandler.js";
-import { toMoney, toPrismaDecimal, type Money } from "../utils/decimal.js";
+import { prisma } from "../config/database";
+import { AppError } from "../middlewares/errorHandler";
+import { toMoney, toPrismaDecimal, type Money } from "../utils/decimal";
 
 interface SenderRow {
   id: string;
@@ -30,7 +30,7 @@ export async function runTransferLogic(
     transactionType,
   });
 
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     // Lock both accounts in deterministic order to avoid deadlocks.
     const lockedAccounts = await tx.$queryRaw<SenderRow[]>`
       SELECT id, balance FROM "Account"

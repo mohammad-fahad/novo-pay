@@ -1,7 +1,7 @@
 import { Decimal } from "decimal.js";
-import { prisma } from "../config/database.js";
-import { toPrismaDecimal } from "../utils/decimal.js";
-import { AppError } from "../middlewares/errorHandler.js";
+import { prisma } from "../config/database";
+import { toPrismaDecimal } from "../utils/decimal";
+import { AppError } from "../middlewares/errorHandler";
 
 export async function createFxQuote(fromCurrency: string, toCurrency: string) {
   if (!fromCurrency || !toCurrency) {

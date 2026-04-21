@@ -1,9 +1,9 @@
 import "dotenv/config";
 import { Worker, type Job } from "bullmq";
-import { redisConnection } from "../config/redis.js";
-import { type PayrollJobData, type PayrollJobResult } from "../services/payrollService.js";
-import { runTransferLogic } from "../services/transferService.js";
-import { toMoney } from "../utils/decimal.js";
+import { getRedisConnection } from "../config/redis";
+import { type PayrollJobData, type PayrollJobResult } from "../services/payrollService";
+import { runTransferLogic } from "../services/transferService";
+import { toMoney } from "../utils/decimal";
 
 type FailedTransferError = Error & { failedTransferIndex?: number };
 
@@ -37,7 +37,7 @@ const payrollWorker = new Worker<PayrollJobData, PayrollJobResult>(
     return { success: true, processed: transfers.length };
   },
   {
-    connection: redisConnection,
+    connection: getRedisConnection(),
     concurrency: 1,
     lockDuration: 5 * 60 * 1000,
   },

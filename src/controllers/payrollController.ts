@@ -1,11 +1,11 @@
 import { type NextFunction, type Request, type Response } from "express";
-import { enqueuePayroll } from "../services/payrollService.js";
-import { ok } from "../utils/response.js";
+import { enqueuePayroll } from "../services/payrollService";
+import { ok } from "../utils/response";
 import {
   type ErrorResponse,
   type PayrollRequestBody,
   type PayrollSuccessResponse,
-} from "../types/api.js";
+} from "../types/api";
 
 export async function payrollController(
   req: Request<Record<string, never>, PayrollSuccessResponse | ErrorResponse, PayrollRequestBody>,

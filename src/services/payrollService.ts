@@ -1,7 +1,7 @@
 import { Queue } from "bullmq";
-import { redisConnection } from "../config/redis.js";
-import { AppError } from "../middlewares/errorHandler.js";
-import { type PayrollTransfer } from "../types/api.js";
+import { getRedisConnection } from "../config/redis";
+import { AppError } from "../middlewares/errorHandler";
+import { type PayrollTransfer } from "../types/api";
 
 export interface PayrollJobData {
   transfers: PayrollTransfer[];
@@ -14,16 +14,21 @@ export interface PayrollJobResult {
 
 const PAYROLL_QUEUE = "payroll-queue";
 
-export const payrollQueue = new Queue<PayrollJobData, PayrollJobResult>(PAYROLL_QUEUE, {
-  connection: redisConnection,
-});
+let payrollQueue: Queue<PayrollJobData, PayrollJobResult> | undefined;
+
+function getPayrollQueue(): Queue<PayrollJobData, PayrollJobResult> {
+  payrollQueue ??= new Queue<PayrollJobData, PayrollJobResult>(PAYROLL_QUEUE, {
+    connection: getRedisConnection(),
+  });
+  return payrollQueue;
+}
 
 export async function enqueuePayroll(transfers: PayrollTransfer[]): Promise<string> {
   if (!Array.isArray(transfers) || transfers.length === 0) {
     throw new AppError("Invalid transfers payload", 400);
   }
 
-  const job = await payrollQueue.add(
+  const job = await getPayrollQueue().add(
     "bulk-payroll",
     { transfers },
     {

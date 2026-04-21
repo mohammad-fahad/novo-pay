@@ -1,5 +1,5 @@
 import { type NextFunction, type Request, type Response } from "express";
-import { AppError } from "./errorHandler.js";
+import { AppError } from "./errorHandler";
 
 export function requireIdempotencyKey(
   req: Request,

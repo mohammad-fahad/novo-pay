@@ -2,8 +2,8 @@ import { Router } from "express";
 import {
   fxQuoteController,
   transferController,
-} from "../controllers/transferController.js";
-import { requireIdempotencyKey } from "../middlewares/idempotency.js";
+} from "../controllers/transferController";
+import { requireIdempotencyKey } from "../middlewares/idempotency";
 
 export const transferRoutes = Router();
 

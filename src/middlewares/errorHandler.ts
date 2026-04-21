@@ -1,5 +1,5 @@
 import { type NextFunction, type Request, type Response } from "express";
-import { fail } from "../utils/response.js";
+import { fail } from "../utils/response";
 
 export class AppError extends Error {
   public readonly statusCode: number;

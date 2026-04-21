@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { payrollController } from "../controllers/payrollController.js";
+import { payrollController } from "../controllers/payrollController";
 
 export const payrollRoutes = Router();
 

@@ -1,13 +1,13 @@
 import { type Request, type Response, type NextFunction } from "express";
-import { createFxQuote } from "../services/quoteService.js";
-import { transferWithIdempotency } from "../services/transferService.js";
-import { ok } from "../utils/response.js";
+import { createFxQuote } from "../services/quoteService";
+import { transferWithIdempotency } from "../services/transferService";
+import { ok } from "../utils/response";
 import {
   type ErrorResponse,
   type FxQuoteRequestBody,
   type TransferRequestBody,
   type TransferSuccessResponse,
-} from "../types/api.js";
+} from "../types/api";
 
 export async function transferController(
   req: Request<Record<string, never>, TransferSuccessResponse | ErrorResponse, TransferRequestBody>,

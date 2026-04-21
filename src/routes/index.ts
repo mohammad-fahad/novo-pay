@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { payrollRoutes } from "./payrollRoutes.js";
-import { transferRoutes } from "./transferRoutes.js";
+import { payrollRoutes } from "./payrollRoutes";
+import { transferRoutes } from "./transferRoutes";
 
 export const apiRoutes = Router();
 
