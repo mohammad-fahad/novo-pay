@@ -1,5 +1,9 @@
-import Decimal from "decimal.js";
-import { Prisma, type Transaction } from "@prisma/client";
+import { Decimal } from "decimal.js";
+import {
+  EntryType,
+  Prisma,
+  type Transaction,
+} from "@prisma/client";
 import { prisma } from "../config/database.js";
 import { AppError } from "../middlewares/errorHandler.js";
 import { toMoney, toPrismaDecimal, type Money } from "../utils/decimal.js";
@@ -9,22 +13,40 @@ interface SenderRow {
   balance: Prisma.Decimal;
 }
 
+type TransactionKind = "TRANSFER" | "PAYROLL";
+
 export async function runTransferLogic(
   fromAccountId: string,
   toAccountId: string,
   amount: Money,
   idempotencyKey: string,
   quoteId?: string,
+  transactionType: TransactionKind = "TRANSFER",
 ): Promise<Transaction> {
+  console.log("[TRANSFER] START", {
+    idempotencyKey,
+    fromAccountId,
+    toAccountId,
+    transactionType,
+  });
+
   return prisma.$transaction(async (tx) => {
-    const [sender] = await tx.$queryRaw<SenderRow[]>`
+    // Lock both accounts in deterministic order to avoid deadlocks.
+    const lockedAccounts = await tx.$queryRaw<SenderRow[]>`
       SELECT id, balance FROM "Account"
-      WHERE id = ${fromAccountId}
+      WHERE id IN (${fromAccountId}, ${toAccountId})
+      ORDER BY id ASC
       FOR UPDATE
     `;
 
+    const sender = lockedAccounts.find((account) => account.id === fromAccountId);
+    const receiver = lockedAccounts.find((account) => account.id === toAccountId);
+
     if (!sender) {
       throw new AppError("SENDER_NOT_FOUND", 400);
+    }
+    if (!receiver) {
+      throw new AppError("RECEIVER_NOT_FOUND", 400);
     }
 
     let finalCreditAmount = amount;
@@ -57,17 +79,20 @@ export async function runTransferLogic(
     });
 
     await tx.account.update({
-      where: { id: toAccountId },
+      where: { id: receiver.id },
       data: { balance: { increment: toPrismaDecimal(finalCreditAmount) } },
     });
 
+    const transactionData = {
+      amount: toPrismaDecimal(amount),
+      currency: "USD",
+      type: transactionType,
+      status: "COMPLETED",
+      idempotencyKey,
+    } as unknown as Prisma.TransactionCreateInput;
+
     const transaction = await tx.transaction.create({
-      data: {
-        amount: toPrismaDecimal(amount),
-        currency: "USD",
-        status: "COMPLETED",
-        idempotencyKey,
-      },
+      data: transactionData,
     });
 
     await tx.ledgerEntry.createMany({
@@ -75,16 +100,22 @@ export async function runTransferLogic(
         {
           accountId: fromAccountId,
           transactionId: transaction.id,
-          type: "DEBIT",
+          type: EntryType.DEBIT,
           amount: toPrismaDecimal(amount.negated()),
         },
         {
           accountId: toAccountId,
           transactionId: transaction.id,
-          type: "CREDIT",
+          type: EntryType.CREDIT,
           amount: toPrismaDecimal(finalCreditAmount),
         },
       ],
+    });
+
+    console.log("[TRANSFER] FINISH", {
+      idempotencyKey,
+      transactionId: transaction.id,
+      transactionType,
     });
 
     return transaction;

@@ -1,4 +1,4 @@
-import Decimal from "decimal.js";
+import { Decimal } from "decimal.js";
 import { Prisma } from "@prisma/client";
 import { type DecimalInput } from "../types/api.js";
 

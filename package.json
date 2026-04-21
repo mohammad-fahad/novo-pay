@@ -1,12 +1,13 @@
 {
   "name": "backend-assessment",
   "version": "1.0.0",
+  "type": "module",
   "main": "dist/server.js",
   "scripts": {
     "start": "node dist/server.js",
-    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "worker:payroll": "ts-node-dev --respawn --transpile-only src/workers/payrollWorker.ts"
+    "worker:payroll": "tsx watch src/workers/payrollWorker.ts"
   },
   "keywords": [],
   "author": "",
@@ -15,16 +16,17 @@
   "dependencies": {
     "@prisma/client": "^6.19.3",
     "bullmq": "^5.75.2",
+    "decimal.js": "^10.6.0",
     "express": "^5.2.1",
     "ioredis": "^5.10.1",
     "prisma": "^6.19.3"
   },
   "devDependencies": {
-    "@types/decimal.js": "^0.0.32",
     "@types/express": "^5.0.6",
     "@types/node": "^25.6.0",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
+    "tsx": "^4.21.0",
     "typescript": "^6.0.3"
   }
 }

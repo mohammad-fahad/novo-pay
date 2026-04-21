@@ -23,6 +23,7 @@ const payrollWorker = new Worker<PayrollJobData, PayrollJobResult>(
           toMoney(transfer.amount),
           transfer.idempotencyKey,
           transfer.quoteId,
+          "PAYROLL",
         );
       } catch (error: unknown) {
         const transferError = (error instanceof Error

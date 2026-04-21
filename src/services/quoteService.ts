@@ -1,4 +1,4 @@
-import Decimal from "decimal.js";
+import { Decimal } from "decimal.js";
 import { prisma } from "../config/database.js";
 import { toPrismaDecimal } from "../utils/decimal.js";
 import { AppError } from "../middlewares/errorHandler.js";

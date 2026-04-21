@@ -1,95 +1,109 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.runTransferLogic = runTransferLogic;
-exports.transferWithIdempotency = transferWithIdempotency;
-const decimal_js_1 = __importDefault(require("decimal.js"));
-const database_js_1 = require("../config/database.js");
-const errorHandler_js_1 = require("../middlewares/errorHandler.js");
-const decimal_js_2 = require("../utils/decimal.js");
-async function runTransferLogic(fromAccountId, toAccountId, amount, idempotencyKey, quoteId) {
-    return database_js_1.prisma.$transaction(async (tx) => {
-        const [sender] = await tx.$queryRaw `
+import { Decimal } from "decimal.js";
+import { EntryType, } from "@prisma/client";
+import { prisma } from "../config/database.js";
+import { AppError } from "../middlewares/errorHandler.js";
+import { toMoney, toPrismaDecimal } from "../utils/decimal.js";
+export async function runTransferLogic(fromAccountId, toAccountId, amount, idempotencyKey, quoteId, transactionType = "TRANSFER") {
+    console.log("[TRANSFER] START", {
+        idempotencyKey,
+        fromAccountId,
+        toAccountId,
+        transactionType,
+    });
+    return prisma.$transaction(async (tx) => {
+        // Lock both accounts in deterministic order to avoid deadlocks.
+        const lockedAccounts = await tx.$queryRaw `
       SELECT id, balance FROM "Account"
-      WHERE id = ${fromAccountId}
+      WHERE id IN (${fromAccountId}, ${toAccountId})
+      ORDER BY id ASC
       FOR UPDATE
     `;
+        const sender = lockedAccounts.find((account) => account.id === fromAccountId);
+        const receiver = lockedAccounts.find((account) => account.id === toAccountId);
         if (!sender) {
-            throw new errorHandler_js_1.AppError("SENDER_NOT_FOUND", 400);
+            throw new AppError("SENDER_NOT_FOUND", 400);
+        }
+        if (!receiver) {
+            throw new AppError("RECEIVER_NOT_FOUND", 400);
         }
         let finalCreditAmount = amount;
         if (quoteId) {
             const quote = await tx.fxQuote.findUnique({ where: { id: quoteId } });
             if (!quote) {
-                throw new errorHandler_js_1.AppError("INVALID_QUOTE", 400);
+                throw new AppError("INVALID_QUOTE", 400);
             }
             if (new Date() > quote.expiresAt) {
-                throw new errorHandler_js_1.AppError("QUOTE_EXPIRED", 400);
+                throw new AppError("QUOTE_EXPIRED", 400);
             }
             if (quote.usedAt) {
-                throw new errorHandler_js_1.AppError("QUOTE_ALREADY_USED", 400);
+                throw new AppError("QUOTE_ALREADY_USED", 400);
             }
-            const exchangeRate = new decimal_js_1.default(quote.rate.toString());
+            const exchangeRate = new Decimal(quote.rate.toString());
             finalCreditAmount = amount.times(exchangeRate);
             await tx.fxQuote.update({ where: { id: quoteId }, data: { usedAt: new Date() } });
         }
-        const currentBalance = new decimal_js_1.default(sender.balance.toString());
+        const currentBalance = new Decimal(sender.balance.toString());
         if (currentBalance.lessThan(amount)) {
-            throw new errorHandler_js_1.AppError("INSUFFICIENT_FUNDS", 400);
+            throw new AppError("INSUFFICIENT_FUNDS", 400);
         }
         await tx.account.update({
             where: { id: fromAccountId },
-            data: { balance: { decrement: (0, decimal_js_2.toPrismaDecimal)(amount) } },
+            data: { balance: { decrement: toPrismaDecimal(amount) } },
         });
         await tx.account.update({
-            where: { id: toAccountId },
-            data: { balance: { increment: (0, decimal_js_2.toPrismaDecimal)(finalCreditAmount) } },
+            where: { id: receiver.id },
+            data: { balance: { increment: toPrismaDecimal(finalCreditAmount) } },
         });
+        const transactionData = {
+            amount: toPrismaDecimal(amount),
+            currency: "USD",
+            type: transactionType,
+            status: "COMPLETED",
+            idempotencyKey,
+        };
         const transaction = await tx.transaction.create({
-            data: {
-                amount: (0, decimal_js_2.toPrismaDecimal)(amount),
-                currency: "USD",
-                status: "COMPLETED",
-                idempotencyKey,
-            },
+            data: transactionData,
         });
         await tx.ledgerEntry.createMany({
             data: [
                 {
                     accountId: fromAccountId,
                     transactionId: transaction.id,
-                    type: "DEBIT",
-                    amount: (0, decimal_js_2.toPrismaDecimal)(amount.negated()),
+                    type: EntryType.DEBIT,
+                    amount: toPrismaDecimal(amount.negated()),
                 },
                 {
                     accountId: toAccountId,
                     transactionId: transaction.id,
-                    type: "CREDIT",
-                    amount: (0, decimal_js_2.toPrismaDecimal)(finalCreditAmount),
+                    type: EntryType.CREDIT,
+                    amount: toPrismaDecimal(finalCreditAmount),
                 },
             ],
+        });
+        console.log("[TRANSFER] FINISH", {
+            idempotencyKey,
+            transactionId: transaction.id,
+            transactionType,
         });
         return transaction;
     });
 }
-async function transferWithIdempotency(input) {
+export async function transferWithIdempotency(input) {
     const { fromAccountId, toAccountId, amount, idempotencyKey, quoteId } = input;
-    const amountDecimal = (0, decimal_js_2.toMoney)(amount);
+    const amountDecimal = toMoney(amount);
     if (!idempotencyKey || !fromAccountId || !toAccountId || !amountDecimal.greaterThan(0)) {
-        throw new errorHandler_js_1.AppError("Missing required fields or invalid amount", 400);
+        throw new AppError("Missing required fields or invalid amount", 400);
     }
-    const existing = await database_js_1.prisma.idempotencyRecord.findUnique({
+    const existing = await prisma.idempotencyRecord.findUnique({
         where: { key: idempotencyKey },
     });
     if (existing) {
         if (existing.status === "COMPLETED" && existing.responseBody) {
             return existing.responseBody;
         }
-        throw new errorHandler_js_1.AppError("Request is already being processed", 429);
+        throw new AppError("Request is already being processed", 429);
     }
-    await database_js_1.prisma.idempotencyRecord.create({
+    await prisma.idempotencyRecord.create({
         data: {
             key: idempotencyKey,
             requestPayload: input,
@@ -99,7 +113,7 @@ async function transferWithIdempotency(input) {
     });
     const result = await runTransferLogic(fromAccountId, toAccountId, amountDecimal, idempotencyKey, quoteId);
     const response = { success: true, transactionId: result.id };
-    await database_js_1.prisma.idempotencyRecord.update({
+    await prisma.idempotencyRecord.update({
         where: { key: idempotencyKey },
         data: {
             status: "COMPLETED",

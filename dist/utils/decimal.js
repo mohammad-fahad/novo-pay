@@ -1,15 +1,8 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.toMoney = toMoney;
-exports.toPrismaDecimal = toPrismaDecimal;
-const decimal_js_1 = __importDefault(require("decimal.js"));
-const client_1 = require("@prisma/client");
-function toMoney(value) {
-    return new decimal_js_1.default(value);
+import { Decimal } from "decimal.js";
+import { Prisma } from "@prisma/client";
+export function toMoney(value) {
+    return new Decimal(value);
 }
-function toPrismaDecimal(value) {
-    return new client_1.Prisma.Decimal(value.toString());
+export function toPrismaDecimal(value) {
+    return new Prisma.Decimal(value.toString());
 }

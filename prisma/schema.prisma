@@ -15,33 +15,36 @@ generator client {
 
 
 model Account {
-  id        String   @id @default(uuid())
-  userId    String
-  currency  String    @default("USD")
-   balance   Decimal  @default(0) @db.Decimal(20, 2)
-  createdAt DateTime @default(now())
-
-   ledgers   LedgerEntry[]
+  id            String        @id @default(uuid())
+  userId        String
+  currency      String        @default("USD")
+  balance       Decimal       @default(0) @db.Decimal(20, 8)
+  createdAt     DateTime      @default(now())
+  ledgerEntries LedgerEntry[]
 }
 
 model Transaction {
-  id            String        @id @default(uuid())
-  amount        Decimal       @db.Decimal(20, 2)
-  currency      String
+  id             String         @id @default(uuid())
+  amount         Decimal        @db.Decimal(20, 8)
+  currency       String
+  type           TransactionType
   status        String        // "PENDING", "COMPLETED", "FAILED"
-  idempotencyKey String       @unique
-  createdAt     DateTime      @default(now())
-  ledgerEntries LedgerEntry[]
+  idempotencyKey String         @unique
+  createdAt      DateTime       @default(now())
+  ledgerEntries  LedgerEntry[]
 }
 
 model LedgerEntry {
   id            String      @id @default(uuid())
   accountId     String
   transactionId String
-  type          String      // "DEBIT" or "CREDIT"
-  amount        Decimal     @db.Decimal(20, 2)
-  account       Account     @relation(fields: [accountId], references: [id])
-  transaction   Transaction @relation(fields: [transactionId], references: [id])
+  type          EntryType
+  amount        Decimal     @db.Decimal(20, 8)
+  account       Account     @relation(fields: [accountId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([accountId])
+  @@index([transactionId])
 }
 
 
@@ -53,6 +56,8 @@ model IdempotencyRecord {
   status         String   // "PROCESSING" or "COMPLETED"
   createdAt      DateTime @default(now())
   expiresAt      DateTime
+
+  @@index([expiresAt])
 }
 
 model FxQuote {
@@ -69,4 +74,9 @@ model FxQuote {
 enum EntryType {
   DEBIT
   CREDIT
+}
+
+enum TransactionType {
+  TRANSFER
+  PAYROLL
 }
