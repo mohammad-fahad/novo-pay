@@ -1,9 +1,16 @@
 import { Landmark } from "lucide-react";
-import { StatCard } from "@/components/dashboard/StatCard";
 import { TransferForm } from "@/components/dashboard/TransferForm";
 import { PayrollHub } from "@/components/dashboard/PayrollHub";
+import { AccountIdForm } from "@/components/dashboard/AccountIdForm";
+import { AccountStats } from "@/components/dashboard/AccountStats";
+import { RecentActivityPanel } from "@/components/dashboard/RecentActivityPanel";
 
-export default function Home() {
+export default async function Home(
+  props: { searchParams: Promise<{ accountId?: string }> },
+): Promise<React.ReactNode> {
+  const searchParams = await props.searchParams;
+  const accountId = searchParams.accountId ?? "";
+
   return (
     <div className="flex flex-col flex-1">
       <header className="border-b bg-background">
@@ -24,15 +31,16 @@ export default function Home() {
       </header>
 
       <main className="mx-auto w-full max-w-6xl flex-1 space-y-6 px-6 py-8">
-        <section className="grid gap-4 md:grid-cols-3">
-          <StatCard title="Balance" value="$12,450.20" hint="Mock value (wire to API when available)" />
-          <StatCard title="Total sent" value="$4,120.00" hint="Mock value" />
-          <StatCard title="Total received" value="$6,880.00" hint="Mock value" />
-        </section>
+        <AccountIdForm accountId={accountId} />
+        <AccountStats accountId={accountId} />
 
         <section className="grid gap-6 lg:grid-cols-2">
           <TransferForm />
           <PayrollHub />
+        </section>
+
+        <section>
+          <RecentActivityPanel accountId={accountId} />
         </section>
       </main>
     </div>
