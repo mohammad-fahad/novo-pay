@@ -1,122 +1,180 @@
-# NovaPay - High-Integrity Financial Transaction System
+# NovaPay - High-Integrity Financial Backend
 
-NovaPay is a robust, senior-level backend engine designed to handle high-concurrency financial transactions with absolute data integrity. Built as a response to critical failures in legacy systems (duplicate disbursements, unbalanced ledgers, and race conditions), this system implements industry-standard safety patterns used in modern fintech.
+NovaPay is a TypeScript-first backend for financial transfers and bulk payroll execution.  
+It is designed around data integrity, race-condition safety, and predictable behavior under retries and concurrent load.
 
-## 🛡️ Core Engineering Principles
+## Core Guarantees
 
-This system is engineered to solve the most common "nightmare" scenarios in banking:
+- **Financial precision:** uses `Decimal.js` and Prisma `Decimal` for currency operations.
+- **Atomic money movement:** debit/credit + ledger writes execute in a single `prisma.$transaction`.
+- **Pessimistic locking:** sender balance checks use `SELECT ... FOR UPDATE` to prevent double-spend races.
+- **Idempotent writes:** transfer processing is guarded by `idempotencyKey`.
+- **Controlled failures:** global error middleware returns sanitized API errors.
 
-### 1. Absolute Atomicity (The Ledger Truth)
+## Tech Stack
 
-Leveraging **Double-Entry Bookkeeping**, every transaction creates balanced Debit and Credit entries. Wrapped in **PostgreSQL Transactions**, the system ensures that money is never created or destroyed, even in the event of a service crash.
+- Node.js (v20+)
+- TypeScript (`strict`)
+- Express
+- Prisma + PostgreSQL
+- BullMQ + Redis
 
-### 2. Idempotency (Exactly-Once Processing)
+## Project Structure
 
-Uses a distributed locking mechanism via an `IdempotencyRecord` table. This prevents duplicate charges caused by network retries or simultaneous request bursts.
+```text
+src/
+  app.ts
+  server.ts
+  config/
+    database.ts
+    redis.ts
+  controllers/
+    transferController.ts
+    payrollController.ts
+  routes/
+    index.ts
+    transferRoutes.ts
+    payrollRoutes.ts
+  services/
+    transferService.ts
+    quoteService.ts
+    payrollService.ts
+  workers/
+    payrollWorker.ts
+  middlewares/
+    errorHandler.ts
+    idempotency.ts
+  utils/
+    decimal.ts
+    response.ts
+  types/
+    api.ts
+```
 
-- **Mechanism:** SHA-256 payload matching and status-based locking.
+## Setup
 
-### 3. Concurrency Control (Pessimistic Locking)
-
-Implements **Row-Level Locking (`FOR UPDATE`)** during balance updates. This eliminates the "Double Spending" problem by forcing concurrent requests to settle sequentially at the database level.
-
-### 4. Temporal Integrity (FX Quote Locking)
-
-Prevents stale exchange rate losses by issuing **Time-Locked Quotes (60s TTL)**. Transfers are rejected if the associated quote has expired or has been previously consumed.
-
----
-
-## 🏗️ Technical Stack
-
-- **Runtime:** Node.js (v20+)
-- **Framework:** Express.js
-- **ORM:** Prisma (v6+)
-- **Database:** PostgreSQL
-- **Precision Math:** Decimal.js (via Prisma) for floating-point error prevention.
-
----
-
-## 🚀 Getting Started
-
-### 1. Installation
+### 1) Install dependencies
 
 ```bash
 npm install
 ```
 
-### 2. Environment Setup
+### 2) Configure environment
 
-Create a `.env` file in the root directory:
+Create `.env` in the project root:
 
 ```env
 DATABASE_URL="postgresql://user:password@host/neondb?sslmode=require"
 PORT=3000
+
+# Optional (defaults shown)
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+# REDIS_PASSWORD=your-password
 ```
 
-### 3. Database Sync
+### 3) Generate Prisma client and sync schema
 
 ```bash
 npx prisma generate
 npx prisma db push
 ```
 
-### 4. Database Safety Net (Critical)
-
-Run the following SQL in your database console to enforce a hardware-level safety net:
+### 4) Add database safety net (recommended)
 
 ```sql
-ALTER TABLE "Account" ADD CONSTRAINT "balance_not_negative" CHECK (balance >= 0);
+ALTER TABLE "Account"
+ADD CONSTRAINT "balance_not_negative" CHECK (balance >= 0);
 ```
 
-### 5. Run the Server
+## Run
+
+### API server (development)
 
 ```bash
+npm run dev
+```
+
+### API server (production build)
+
+```bash
+npm run build
 npm start
 ```
 
-## 📊 API Documentation
+### Payroll worker
 
-### 1. Generate FX Quote
-
-`POST /fx/quote`  
-Purpose: Locks an exchange rate for 60 seconds.  
-Body:
-
-```json
-{ "fromCurrency": "USD", "toCurrency": "EUR" }
+```bash
+npm run worker:payroll
 ```
 
-### 2. Execute Transfer
+## API Endpoints
 
-`POST /transfer`  
-Purpose: Executes an idempotent, cross-currency transfer.  
-Body:
+### Health
+
+- `GET /health`
+
+### Generate FX quote
+
+- `POST /fx/quote`
+- Request body:
 
 ```json
 {
-"fromAccountId": "sender-uuid",
-"toAccountId": "receiver-uuid",
-"amount": 100.00,
-"idempotencyKey": "unique-client-generated-uuid",
-"quoteId": "optional-fx-quote-uuid"
+  "fromCurrency": "USD",
+  "toCurrency": "EUR"
 }
 ```
 
-## 🧪 Validated Scenarios
+### Execute transfer
 
-- Scenario A (Duplicate Click): Same `idempotencyKey` returns the cached response without re-processing.
-- Scenario B (Race Condition): 10 simultaneous requests to the same account settle one-by-one; 0% chance of overdraft.
-- Scenario C (Stale FX): If the `quoteId` is over 60 seconds old, the transaction is automatically rolled back.
-- Scenario D (Atomic Failure): If the ledger entry fails to write, the sender's balance update is reverted.
+- `POST /transfer`
+- Requires `idempotencyKey`
+- Request body:
 
-## 📈 Future Roadmap
+```json
+{
+  "fromAccountId": "sender-uuid",
+  "toAccountId": "receiver-uuid",
+  "amount": 100.0,
+  "idempotencyKey": "unique-client-generated-uuid",
+  "quoteId": "optional-fx-quote-uuid"
+}
+```
 
-- Asynchronous Payroll: Integration with BullMQ for bulk disbursements.
-- Field-Level Encryption: Envelope encryption for PII (Personally Identifiable Information).
-- Audit Hash Chain: Cryptographic linking of ledger rows to detect database tampering.
+### Enqueue bulk payroll
 
+- `POST /payroll/bulk`
+- Request body:
 
-Developed by: 
-### Mohammad Fahad 
+```json
+{
+  "transfers": [
+    {
+      "fromAccountId": "sender-uuid",
+      "toAccountId": "receiver-uuid",
+      "amount": 250.0,
+      "idempotencyKey": "batch-1-transfer-1",
+      "quoteId": "optional-fx-quote-uuid"
+    }
+  ]
+}
+```
 
+## High-Value Test Scenarios
+
+- Duplicate transfer retries with same `idempotencyKey`.
+- Concurrent debits against the same source account.
+- Expired FX quote usage.
+- Failure in ledger creation inside transaction boundary.
+- Bulk payroll batch retries with one failing transfer.
+
+## Notes
+
+- This service expects PostgreSQL and Redis to be reachable before startup.
+- Keep all monetary values in decimal-compatible formats (`string` or `number`) and avoid floating-point business logic.
+
+---
+
+Developed by Mohammad Fahad.  
 Building resilient systems for the future of finance.
