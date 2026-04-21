@@ -5,14 +5,13 @@ import { type PayrollJobData, type PayrollJobResult } from "../services/payrollS
 import { runTransferLogic } from "../services/transferService";
 import { toMoney } from "../utils/decimal";
 
-type FailedTransferError = Error & { failedTransferIndex?: number };
-
 const PAYROLL_QUEUE = "payroll-queue";
 
 const payrollWorker = new Worker<PayrollJobData, PayrollJobResult>(
   PAYROLL_QUEUE,
   async (job: Job<PayrollJobData, PayrollJobResult>): Promise<PayrollJobResult> => {
     const { transfers } = job.data;
+    let failed = 0;
 
     for (let i = 0; i < transfers.length; i += 1) {
       const transfer = transfers[i];
@@ -26,15 +25,20 @@ const payrollWorker = new Worker<PayrollJobData, PayrollJobResult>(
           "PAYROLL",
         );
       } catch (error: unknown) {
-        const transferError = (error instanceof Error
-          ? error
-          : new Error("Payroll transfer failed")) as FailedTransferError;
-        transferError.failedTransferIndex = i;
-        throw transferError;
+        failed += 1;
+        const transferError = error instanceof Error ? error : new Error("Payroll transfer failed");
+        console.error("[PAYROLL_WORKER] transfer failed", {
+          jobId: job.id,
+          index: i,
+          fromAccountId: transfer.fromAccountId,
+          toAccountId: transfer.toAccountId,
+          idempotencyKey: transfer.idempotencyKey,
+          message: transferError.message,
+        });
       }
     }
 
-    return { success: true, processed: transfers.length };
+    return { success: true, processed: transfers.length, failed };
   },
   {
     connection: getRedisConnection(),

@@ -10,5 +10,5 @@ app.get("/health", (_req, res) => {
   res.json({ status: "live", timestamp: new Date().toISOString() });
 });
 
-app.use(apiRoutes);
+app.use("/api", apiRoutes);
 app.use(errorHandler);

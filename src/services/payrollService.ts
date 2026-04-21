@@ -10,6 +10,7 @@ export interface PayrollJobData {
 export interface PayrollJobResult {
   success: true;
   processed: number;
+  failed: number;
 }
 
 const PAYROLL_QUEUE = "payroll-queue";

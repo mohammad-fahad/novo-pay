@@ -3,4 +3,4 @@ import { payrollController } from "../controllers/payrollController";
 
 export const payrollRoutes = Router();
 
-payrollRoutes.post("/payroll/bulk", payrollController);
+payrollRoutes.post("/payroll/disburse", payrollController);
